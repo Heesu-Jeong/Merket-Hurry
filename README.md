@@ -2,8 +2,7 @@
 
 ![Merket Hurry](https://ifh.cc/g/6rR57T.jpg)
 
-### [:arrow_forward: Preview]
-<a href = "https://ithansiyeon.github.io/Portfolio1/">마켓허리 바로가기</a>
+
 
 ### 👋 Introduction
 
