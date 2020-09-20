@@ -1,24 +1,21 @@
-# Merket-Hurry
-
-# SIYEON HAN's Portfolio
-
+# Merket-Hurry '오늘의 장보기 : 마켓허리'
 
 
 ### [:arrow_forward: Preview]
-<a href = "https://ithansiyeon.github.io/Portfolio1/">포트폴리오 바로가기</a>
+<a href = "https://ithansiyeon.github.io/Portfolio1/">마켓허리 바로가기</a>
 
 ### 👋 Introduction
 
 <table>
     <tr>
         <th>프로젝트명</th>
-        <th>Portfolio</th>
+        <th>Merket Hurry</th>
         <th>개발 기간</th>
         <th>2020.07.20. ~ 2020.08.27.</th>
     </tr>
     <tr>
         <th>프로젝트 성격</th>
-        <th>포트폴리오 프로젝트</th>
+        <th>웹 페이지 구현 프로젝트</th>
         <th>개발 인원</th>
         <th>개인 / 6명</th>
     </tr>
