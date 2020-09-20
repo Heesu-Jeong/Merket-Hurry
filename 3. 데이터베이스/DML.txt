@@ -1,0 +1,485 @@
+>>>>>>>>>>>>>>> 예지 <<<<<<<<<<<<<<<<<<
+
+<상품 상세페이지(user - ProductDAO)>
+-- 해당 상품번호에 맞는 상품 정보(상품 번호, 이름, 부제, 내용, 가격, 이미지)를 반환
+select seq, name, shortdesc, content, price, img from product where seq=?;
+
+-- 해당 상품번호에 있는 상품후기를 반환
+select rownum, r.seq as seq, r.title as title, m.name as name, to_char(r.regdate, 'yyyy-mm-dd') as regdate, r.readcount as readcount, r.image as image, r.content as content, m.id as id 
+from member m 
+    inner join orderlist ol 
+        on m.seq = ol.memberseq 
+            inner join orderdetail od
+                on ol.seq = od.orderseq
+                    inner join review r
+                        on r.orderdetailseq = od.seq
+                            where od.productseq = ?;
+
+-- 후기 번호를 받아 조회수를 올려줌
+update review set readcount = readcount + 1 where seq = ?;
+
+-- 해당 상품번호의 상품문의(번호, 제목, 등록일, 내용, 이미지, id, 답변) 반환
+select rownum, i.seq as seq, i.title as title, to_char(i.regdate, 'yyyy-mm-dd') as regdate, i.img as img, i.content as content, i.answer as answer, (select id from member where seq = m.seq) as id 
+from inquiry i
+    inner join member m
+        on m.seq = i.memberseq
+            where i.productseq = ?;
+
+-- 해당 묶음상품번호와 관련된 레시피번호, 레시피제목, 레시피 이미지를 반환(3개)
+select rownum, r.seq, r.title, r.img from receipe r inner join combiproduct cp on cp.receipeseq = r.seq where cp.productseq=? and rownum <= 3;
+
+-- 해당 상품번호와 일치하는 상품번호, 상품명 반환(상품문의 작성페이지에서 사용)
+select seq, name from product where seq = ?;
+
+-- 상품문의 작성(상품번호, 회원번호, 제목, 내용, 이미지)
+insert into inquiry (seq, productseq, memberseq, title, content, img, regdate) values (seqinquiry.nextval, ?, ?, ?, ?, ?, default);
+
+-- 찜 목록에 같은 상품이 존재하는지 확인(회원번호, 상품번호)
+select count(*) as cnt from jjim where memberseq = ? and productseq=?;
+
+-- 찜 목록에 추가(회원번호, 상품번호)
+insert into jjim (seq, memberseq, productseq) values (seqjjim.nextval, ?, ?);
+
+-- 장바구니에 같은 상품이 존재하는지 확인
+select count(*) as cnt from shoppingcart where memberseq = ? and productseq=?;
+
+-- 장바구니에 상품 추가(회원번호, 상품번호, 수량) - 이미 담겨진 상품인 경우
+update shoppingcart set qty = ? where memberseq = ? and productseq = ?;
+
+-- 장바구니에 상품 추가(회원번호, 상품번호, 수량) - 처음 담는 상품
+insert into shoppingcart (seq, memberseq, productseq, qty, regdate) values (seqshoppingcart.nextval, ?, ?, ?, sysdate);
+
+
+
+<ReviewDAO>
+-- 상품 후기 조회 수 관련
+update review set readcount = readcount + 1 where seq = ?;
+
+
+
+<MemberDAO>
+-- 회원번호로 해당 회원의 id와 회원등급을 가져와 후에 적립율을 계산
+select id, gradeseq from member where seq = ?;
+
+
+
+<고객센터 - 공지사항(CustomercenterDAO)>
+-- 공지사항 조회수 증가
+update notice set readcount = readcount + 1 where seq = ?;
+
+-- 해당 글 번호를 가진 공지사항을 반환
+select title, regdate, readcount, content from notice where seq=?;
+
+-- 검색 후 페이징을 위함
+select count(*) as cnt from notice where (title like '%%%s%%' or content like '%%%s%%');
+
+-- 게시판 목록(%s는 begin과 end) - 검색어가 있는 경우
+select seq, title, regdate, readcount from (select a.*, rownum as rnum from (select * from notice where title like '%%' || ? || '%%' or content like '%%' || ? || '%%' order by seq desc) a) where rnum >= %s and rnum <= %s order by seq desc;
+
+-- 게시판 목록(%s는 begin과 end) - 검색어가 없는 경우
+select seq, title, regdate, readcount from (select a.*, rownum as rnum from (select * from notice order by seq desc) a) where rnum >= %s and rnum <= %s order by seq desc;
+
+
+
+
+
+
+<관리자(ProductDAO)>
+-- 관리자 - 상품조회에서 검색어가 있을 경우
+select seq, name, regdate, category, price from product where name like '%%" + search + "%%' order by seq asc;
+
+-- 관리자 - 상품조회에서 검색어가 없는 경우
+select seq, name, regdate, category, price from product order by seq asc
+
+
+
+
+<관리자(RankingDAO)>
+-- 관리자 - 통계관리 (상품 카테고리 번호(0~8) 반환)
+select distinct category from product order by category asc;
+
+-- 관리자 - 통계관리 - 판매상품순위에서 검색과 관련(상황에 따라 4가지 쿼리)
+-- 검색X, 분류O
+select p.category as category, p.seq as seq, p.name as name, p.price as price, p.sales as sales, (select count(*) from orderdetail od inner join orderlist ol on od.orderseq = ol.seq inner join delivery d on ol.seq = d.orderseq where d.category = 3 and od.productseq=p.seq) as refund
+    from product p
+        where rownum <= 10 and category = sel
+            order by sales desc;
+
+-- 검색O, 분류O
+select p.category as category, p.seq as seq, p.name as name, p.price as price, p.sales as sales, (select count(*) from orderdetail od inner join orderlist ol on od.orderseq = ol.seq inner join delivery d on ol.seq = d.orderseq where d.category = 3 and od.productseq=p.seq) as refund
+    from product p
+        where name like '%%" + search + "%%' and category = sel
+            order by sales desc;
+
+-- 검색O, 분류X
+select p.category as category, p.seq as seq, p.name as name, p.price as price, p.sales as sales, (select count(*) from orderdetail od inner join orderlist ol on od.orderseq = ol.seq inner join delivery d on ol.seq = d.orderseq where d.category = 3 and od.productseq=p.seq) as refund
+    from product p
+        where name like '%%" + search + "%%'
+            order by sales desc;
+
+-- 검색X, 분류X
+select p.category as category, p.seq as seq, p.name as name, p.price as price, p.sales as sales, (select count(*) from orderdetail od inner join orderlist ol on od.orderseq = ol.seq inner join delivery d on ol.seq = d.orderseq where d.category = 3 and od.productseq=p.seq) as refund
+from product p
+    where rownum <= 10
+        order by sales desc;
+
+>>>>>>>>>>>>>>> 소진 <<<<<<<<<<<<<<<<<<
+
+-- 나만의 레시피에서 등록되어져있는 레시피의 목록을 불러오는 뷰테이블
+create or replace view vwRecipe
+as
+select 
+    r.seq as seq, --recipe seq
+    r.img as img, -- recipe images
+    r.category as category,  --recipe category
+    r.title as title,  --recipe title
+    m.id as memberID, --member id
+    r.readcount as readcount, -- recipe readcount
+    r.regdate as regdate -- recipe regdate
+        from receipe r  --receipe table
+            inner join member m --member table
+                on m.seq = r.memberseq;
+             
+        
+    
+-- 나만의 레시피에서 등록되어져있는 레시피의 데이터를 불러오는 뷰테이블
+create or replace view vwRecipeDetail
+as
+select 
+    r.seq as seq, --recipe seq
+    r.img as IMG, --recipe images
+    m.id as MemberID, --member id
+    r.category as Category,  -- recipe category
+    r.title as Title,  -- recipe title
+    r.readcount as Readcount,  --recipe readcount
+    r.content as Content, --recipe content
+    rc.content as AnwserContent, -- commentrecipe content
+    to_char(rc.regdate,'yyyy-mm-dd') as Regdate, --commentrecipe regdate 
+    c.productseq as Product, -- combiproduct product seq
+    p.name as ProductName, -- product name
+    p.price as ProductPrice -- prodcut price
+        from receipe r --receipe table
+            inner join receipecomment rc --commentreceipe table
+                on rc.receipeseq = r.seq
+                   inner join combiproduct c --combiproduct table
+                         on c.receipeseq = r.seq
+                                inner join product p -- product table 
+                                    on p.seq = c.productseq
+                                        inner join member m --member table
+                                           on m.seq = r.memberseq;              
+
+
+-- 마이레시피 글 올리기에서 재료들의 리스트를 불러오는 뷰테이블
+create or replace view vwChoiceFD
+as
+select ol.memberseq as seq, -- member seq
+        p.img as pimg, --product images
+       p.name as pName, -- product name
+       to_char(ol.regdate,'yyyy-mm-dd') as pDate--product regdate
+        from orderdetail od --orderdetail table
+         inner join orderlist ol -- orderlist table
+            on ol.seq = od.orderseq
+                inner join product p --product table
+                    on p.seq = od.productseq
+                        order by pDate desc;
+
+-- myrecipe의 게시글을 페이징으로 담는 select문
+select * from (select a.* , rownum as rnum from (select * from vwRecipe  where delflag=0 order by regdate desc) a) where rnum >= 1 and rnum <= 10 order by regdate desc
+ 
+
+--나만의 레시피에서 count 수를 나타내는 select문 
+select count(*) as cnt from vwrecipe where delflag=0
+
+-- 조회수를 수정하는 update문
+ update receipe set readCount = readCount + 1 where seq = ?
+
+-- recipe detail 페이지에서 리스트를 나타내는 select문
+select seq, memberseq, (select id from member where seq = r.memberseq) as memberid, title, content,regdate, readcount, img, category from receipe r  where seq = ? and delflag=0;
+
+-- 묶은상품의 상품 재료들의 리스트를 나타내는 select문
+select to_char( p.price , '999,999,999,999,999') as price, p.name as name, p.seq as seq from combiproduct cp inner join product p on cp.productseq=p.seq where receipeseq = ? and p.delflag = 0
+
+-- 댓글의 리스트를 나타내는 select문
+select a.*, (select id from Member where seq = a.memberseq and delflag=0) as memberID from receipeComment a where receipeseq = ? and delflag=0 order by regdate asc
+
+-- 새로운 댓글을 추가하는 inser문
+insert into receipecomment (seq, receipeseq, commentseq, memberseq, content, regdate, delflag) values (seqreceipecomment.nextVal, ?, null, ?, ?, sysdate, default)
+
+-- 베스트레시피의 조회수로 3위까지 보여주는 select문
+select rownum, x.* from ( select a.* from vwRecipe a order by a.readcount desc) x where rownum <= 3 and delflag = 0
+
+-- 나만의레시피의 글을 자신의 사용한 글만 삭제 가능 버튼이 보이도록 하는 select문
+select count(*) as cnt from receipe a where (select id from Member where seq = a.memberseq) = ? and seq = ? and delflag = 0 
+
+-- 나만의 레시피를 삭제하는 update문 (delflag를 1로 변경)
+update receipe set delflag = 1 where seq = ?
+
+-- 나만의 레시피를 수정하는 update문
+update receipe set category = ?, title = ?, content = ?, regdate = sysdate, img = ? where seq = ?
+
+-- 나만의 레시피의 댓글을 삭제하는 update문 (delglag를 1로 변경)
+update receipecomment set delflag = 1 where seq = ?
+
+-- 묶음 상품을 장바구니에 담기버튼을 클릭시 장바구니에 추가시키는 insert문
+insert into shoppingcart (seq, memberseq,productseq, qty, regdate, delflag) values (SEQSHOPPINGCART.nextval,?,?,1,sysdate,default)
+
+-- 레시피의 새로운 글을 추가시키는 insert문
+insert into receipe (seq, memberseq, category, title, content, regdate, readcount, img, delflag) values (seqreceipe.nextVal,?,?,?,?,sysdate,0,?,default)
+
+-- 사용자의 구매리스트를 보여주는 select문
+select * from vwChoiceFD where mseq = ?
+
+-- 사용자가 선택한 상품의 목록을 묶음 상품으로 만드는 insert문
+insert into combiProduct (seq, receipeseq, productseq, delflag) values (seqcombiproduct.nextVal,(select max(seq) from receipe),?,default)
+
+>>>>>>>>>>>>>>> 희수 <<<<<<<<<<<<<<<<<<
+
+--상품 카테고리 별 상품 갯수 가져오기
+select count(*) as cnt from product where category=?
+
+
+--상품 정보 가져오기 + 상품 페이징하기
+select * from(select a.* , rownum as rnum from(select * from product where name like '%%' || ? || '%%' or shortdesc like '%%' || ? || '%%' or content like '%%' || ? || '%%')a) where rnum >= %d and rnum <= %d
+
+
+--장바구니에 담긴 상품목록 가져오기
+select p.seq as pseq, p.name as name, p.img as img, p.price as price, sc.qty as qty from shoppingcart sc inner join product p on sc.productseq=p.seq where p.delflag = 0 and sc.delflag = 0  and sc.memberseq = ?
+
+--로그인 한 회원정보 가져오기
+select seq,name,tel,email,address from member where seq = ?
+
+
+--주문하기 결제 버튼 클릭 후 주문테이블에 데이터 보내기
+insert into orderlist (seq, memberseq, regdate, price,delflag) values (seqorderlist.nextVal,?,sysdate,?,0)
+
+
+--주문하기 결제 버튼 클릭 후 주문상세테이블에 데이터 보내기
+insert into orderdetail (seq, productseq, orderseq, qty,delflag) values (seqorderdetail.nextVal,?,(select max(seq) from orderlist),?,0)
+
+
+>>>>>>>>>>>>>>> 수진 <<<<<<<<<<<<<<<<<<
+---------- VIEW ----------
+-- 주문목록 뷰
+create or replace view vworderlist
+  select
+    d.seq dseq,
+    ol.seq olseq,
+    od.seq odseq,
+    ol.memberseq mseq,
+    ol.price totalprice,
+    p.seq pseq,
+    p.price price,
+    p.name pname,
+    p.img img,
+    od.qty qty,
+    ol.regdate regdate,
+    d.status status,
+    d.category category,
+    d.deliverycomplete dregdate
+from orderlist ol
+    left outer join delivery d
+        on d.orderseq = ol.seq
+    inner join orderdetail od
+        on ol.seq = od.orderseq
+    inner join product p
+        on od.productseq = p.seq
+order by regdate desc, olseq, pseq asc, dregdate desc;
+
+
+
+---------- PROCEDURE ----------
+-- 회원의 현재 마일리지를 가져오는 프로시저
+create or replace procedure proc_nowmileage (
+    pmseq varchar2,
+    total out number
+)
+is
+    acc number; -- 적립
+    use number; -- 사용
+begin
+
+    select nvl(sum(price),0) into acc from mileage where memberseq = pmseq and category = 1 and delflag = 0;
+    select nvl(sum(price),0) into use from mileage where memberseq = pmseq and category = 0 and delflag = 0;
+
+    total := acc - use;
+
+end proc_nowmileage;
+
+
+
+---------- SQL ----------
+-- 회원의 등급 정보를 가져옴
+select name, discountper, mileageper from grade where seq = ? and delflag = 0;
+
+-- 회원의 이번 달 총 구매 금액을 가져옴
+select sum(price) sum from orderlist where regdate >= TRUNC(SYSDATE, 'MONTH') and regdate <= sysdate and memberseq = ? and delflag = 0;
+
+-- 회원의 마일리지 적립, 사용 내역을 받아옴
+select category, reason, price, regdate from mileage where memberseq = ? and delflag = 0 order by regdate desc;
+
+-- 회원이 작성한 레시피의 리스트를 받아옴
+select seq, category, title, img from receipe where memberseq = ? and delflag = 0;
+
+-- 비밀번호 확인을 해 줌
+select count(*) as cnt from member where id=? and pw=? and delflag = 0;
+
+-- 회원의 전체 주문 목록을 받아옴
+select * from vwOrderlist where mseq = ?;
+
+-- 회원이 선택한 주문 목록의 세부 주문 내역을 받아옴
+select * from vwOrderlist where olseq = ?;
+
+-- 회원의 특정 년도 주문 목록을 받아옴
+select * from vwOrderlist where mseq = ? and (regdate > ? || '-01-01') and (regdate < ? || '-01-01');
+
+-- 회원의 작성한 모든 후기를 받아옴 (출력용)
+select r.*, (select name from product where seq = (select productseq from orderdetail o where seq = r.orderdetailseq and delflag = 0)) as pname from review r where orderdetailseq in (select odseq from vwOrderlist where mseq = ? and delflag = 0);
+
+-- 회원의 작성 가능한 후기를 받아옴
+select * from vworderlist where mseq = ? and dregdate > (sysdate - 30) and odseq not in (select orderdetailseq from review where delflag=0 and orderdetailseq in (select odseq from vwOrderlist where mseq = ? and dregdate > (sysdate - 30)));
+
+-- 회원이 작성한 후기를 받아옴 (후기 수정용)
+select r.*, (select name from product where seq = (select productseq from orderdetail o where seq = r.orderdetailseq and delflag = 0)) as pname from review r where seq = ? and delflag = 0;
+
+-- 회원의 후기 수정 내역을 업데이트함
+update review set title = ?, content = ?, image = ? where seq = ?;
+
+-- 회원의 후기 삭제 내역을 업데이트함
+update review set delflag = 1 where seq = ?;
+
+-- 회원이 작성한 후기의 내용을 추가함
+insert into review values (SEQREVIEW.nextval, ?, ?, ?, ?, sysdate, 0, default);
+
+-- 회원의 찜목록을 받아옴
+select j.seq jseq, p.seq pseq, p.name pname, p.price price, p.img image from jjim j inner join product p on p.seq = j.productseq where j.memberseq = ? and j.delflag = 0 and p.delflag = 0;
+
+-- 회원의 찜목록 삭제 내역을 업데이트함
+update jjim set delflag = 1 where seq = ?;
+
+>>>>>>>>>>>>>>> 현동 <<<<<<<<<<<<<<<<<<
+
+-- 이벤트 배너
+select * from event where seq >= 106;
+
+-- 이벤트 상품 리스트
+select p.seq, p.img, p.name, p.price, p.shortdesc from eventproduct ep, product p, event e where ep.productseq = p.seq and e.seq = ep.eventseq and e.seq = 106;
+
+-- 핫상품 리스트(30개, 판매율 높은 순으로 오름차순)
+select a.*, rownum as rnum from (select distinct p.seq as seq, p.name as name, p.img as img, p.price as price, p.shortdesc as shortdesc, (select count(*) from orderdetail where productseq = od.productseq) as cnt from product p, orderdetail od where p.seq = od.productseq order by cnt desc)a where rownum <= 30;
+
+-- 알뜰상품 리스트(30개, 판매율 낮은 순으로 내림차순)
+select a.*, rownum as rnum from (select distinct p.seq as seq, p.name as name, p.img as img, p.price as price, p.shortdesc as shortdesc, (select count(*) from orderdetail where productseq = od.productseq) as cnt from product p, orderdetail od where p.seq = od.productseq order by cnt asc)a where rownum <= 30;
+
+-- 배송 view
+create or replace view vwdelivery as
+select
+    list.regdate as order_regdate,         -- 주문날짜
+    list.seq as order_seq,                 -- 주문번호
+    m.name as order_name,                  -- 주문자
+    p.name as product_name,                -- 상품명
+    detail.qty as product_qty,             -- 수량
+    list.price as order_price,             -- 결제금액
+    d.category as delivery_category,      -- 배송분류
+    d.status as delivery_status,           -- 배송상태
+    d.deliverycomplete as delivery_regdate -- 배송날짜
+from product p
+    inner join orderdetail detail on detail.productseq = p.seq
+    inner join orderlist list on detail.orderseq = list.seq
+    inner join member m on list.memberseq = m.seq
+    inner join delivery d on d.orderseq = list.seq;
+
+-- 배송 view
+select * from vwdelivery;
+
+-- 배송 검색
+    -- 주문번호만
+select * from vwdelivery where order_seq = 10002 order by delivery_regdate desc;
+    -- 기간만
+select * from vwdelivery where delivery_regdate between '20/08/01' and '20/08/31' order by delivery_regdate desc;
+    -- 상품명만
+select * from vwdelivery where product_name like '%돈까스%' order by delivery_regdate desc;
+    -- 분류별만
+select * from vwdelivery where delivery_category = 3 order by delivery_regdate desc;
+    -- 주문번호, 기간, 상품별
+select * from vwdelivery where order_seq = 10 and product_name like '%돈까스%' and delivery_regdate between '19/06/28' and '19/06/28';
+
+>>>>>>>>>>>>>>> 이호 <<<<<<<<<<<<<<<<<<
+
+-- 고객관리 검색 
+이름 : select * from(select a.*,rownum as rnum from(select * from member where name like '%' || ? || '%' order by seq desc)  a) where rnum >= ? and rnum <= ?
+주소 : select * from(select a.*,rownum as rnum from(select * from member where address like '%' || ? || '%' order by seq desc) a) where rnum >= ? and rnum <= ?
+이메일 : select * from(select a.*,rownum as rnum from(select * from member where email like '%' || ? || '%' order by seq desc) a) where rnum >= ? and rnum <= ?
+휴대폰 : select * from(select a.*,rownum as rnum from(select * from member where tel like '%' || ? || '%' order by seq desc) a) where rnum >= ? and rnum <= ?
+
+-- 고객관리 총 검색결과 갯수
+이름 : select count(*) as cnt from member where name = ?
+주소 : select count(*) as cnt from member where address like '%' || ? || '%'
+이메일 : select count(*) as cnt from member where email = ?
+휴대폰 : select count(*) as cnt from member where tel = ?
+
+-- 주문관리 전체주문목록
+select ol.seq as seq, ol.regdate as regdate, (select id from member where seq=ol.memberseq) as id, ol.price as price, p.name as pname, p.category as category, od.qty  as qty from orderlist ol inner join orderdetail od on ol.seq = od.orderseq inner join product p on p.seq = od.productseq where ol.delflag = 0 and memberseq in (select seq from member where id like '%' || ? || '%')  and ol.regdate >= ? and ol.regdate <= ?
+
+-- 묶음상품 insert
+insert into combiProduct values (seqcombiProduct.nextVal, ?,?, default)
+
+-- 상품 insert
+insert into product values (seqproduct.nextVal,?,?,?,?,?,'20190101',?,default,default)
+
+-- 레시피 insert
+insert into receipe values (seqreceipe.nextVal,?,?,?,?,?,?,?,default)
+
+-- 로그인 시 id, pw 일치 확인
+select pw from member where id=? and delflag=0
+
+-- 로그인 성공한 멤버에 데이터 넣기
+select * from member where id=?
+
+-- 아이디 중복 검색
+select count(*) as cnt from member where id=? and delflag=0
+
+-- 이메일 중복 검색
+select count(*) as cnt from member where email=? and delflag=0
+
+-- 오늘의  상품 가져오기
+select p.seq as productseq, p.name as name, p.price as price, p.img as img, p.shortdesc as shortdesc from(select rownum, a.* from (select * from orderdetail od inner join orderlist ol on od.orderseq = ol.seq where regdate = sysdate and ol.delflag = 0 order by qty desc)a where rownum <= 8) a inner join product p on a.productseq = p.seq
+
+-- HOT 상품 가져오기
+select a.*, rownum as rnum from (select distinct p.seq as seq, p.name as name, p.img as img, p.price as price, p.shortdesc as shortdesc, (select count(*) from orderdetail where productseq = od.productseq) as cnt from product p, orderdetail od where p.seq = od.productseq order by cnt desc)a where rownum <= 8
+
+-- 알뜰상품 가져오기
+select a.*, rownum as rnum from (select distinct p.seq as seq, p.name as name, p.img as img, p.price as price, p.shortdesc as shortdesc, (select count(*) from orderdetail where productseq = od.productseq) as cnt from product p, orderdetail od where p.seq = od.productseq order by cnt asc)a where rownum <= 8
+
+-- 이달의 이벤트 가져오기
+select * from event where seq in (106,107,108) and delflag = 0
+
+-- 마켓허리의 추천 가져오기 (최초 채소 카테고리)
+select * from(select * from product where category = 0 and delflag = 0 order by regdate desc) a where rownum <=8
+
+-- 마켓허리의 추천 가져오기 (사용자 입력 반응형)
+select * from(select * from product where delflag = 0 and category=? order by regdate desc) a where rownum <=4
+
+-- 회원가입 완료
+insert into member values (seqmember.nextVal,?,?,?,?,?,default,?,?,?,default)
+
+-- 상품목록 검색결과
+select * from(select a.* , rownum as rnum from(select * from product where name like '%%' || ? || '%%' or shortdesc like '%%' || ? || '%%' or content like '%%' || ? || '%%')a) where rnum >= %d and rnum <= %d",map.get("begin"),map.get("end")ㅌ
+
+-- 상품목록 검색결과 총 갯수
+select count(*) as cnt from product where name like '%' || ? || '%' or shortdesc like '%' || ? || '%' or content like '%' || ? || '%'
+
+-- 특정회원 장바구니 데이터 가져오기
+select p.seq as pseq, p.name as name, p.img as img, p.price as price, sc.qty as qty from shoppingcart sc inner join product p on sc.productseq=p.seq where p.delflag = 0 and sc.delflag = 0  and sc.memberseq = ?
+
+-- 회원 할인율 가져오기
+select (select discountper from grade where seq = gradeseq) as per from member where seq = ? and delflag=0
+
+-- 장바구니 상품 수량 +
+update shoppingcart set qty = qty+1 where memberseq = ? and productseq = ?
+
+-- 장바구니 상품 수량 -
+update shoppingcart set qty = qty-1 where memberseq = ? and productseq = ?
+
+-- 장바구니 상품 삭제
+delete from shoppingcart where memberseq = ? and productseq = ?
+
