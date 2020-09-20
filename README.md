@@ -54,8 +54,14 @@ Git Pages와 HTML5, CSS3, JavaScript, jsp, Ajax ,JQuery, Bootstrap 등을 이용
  <tr><th colspan="3">Mian</th></tr>
     <tr>
         <td ><img height="250" src="https://ifh.cc/g/ipNAga.png"></td>
-     <td  ><img height="250" src="https://ifh.cc/g/ipNAga.png"></td>
-     <td ><img height="250" src="https://ifh.cc/g/ipNAga.png"></td>
+     <td  ><img height="250" src="https://ifh.cc/g/g1jT8N.jpg"></td>
+     <td ><img height="250" src="https://ifh.cc/g/xARYRq.jpg"></td>
+    </tr>
+    <tr><th colspan="3">Admin</th></tr>
+    <tr>
+        <td ><img height="250" src="https://ifh.cc/g/hxj8vs.jpg"></td>
+     <td  ><img height="250" src="https://ifh.cc/g/u73ZiL.png"></td>
+     <td ><img height="250" src="https://ifh.cc/g/rpoFTD.png"></td>
     </tr>
 
 </table>
