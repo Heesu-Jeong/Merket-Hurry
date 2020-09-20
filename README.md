@@ -54,7 +54,7 @@ Git Pages와 HTML5, CSS3, JavaScript, jsp, Ajax ,JQuery, Bootstrap 등을 이용
         <th>Admin</th>
     </tr>
     <tr>
-        <td><img width="300" height="250" src=""></td>
+        <td><img width="300" height="250" src="https://ifh.cc/g/ipNAga.png"></td>
         <td><img width="300" height="250" src="h"></td>
     </tr>
       
